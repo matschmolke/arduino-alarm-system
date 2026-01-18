@@ -117,7 +117,7 @@ void handleDisarmedState()
   if(lastButtonState && !currentButtonState)
   {
     state = ARMING;
-    logEvent("UZBRAJANIE ALARMU");
+    logEvent("UZBRAJANIE ALARMU...");
     clearDisplay(0);
   }
   lastButtonState = currentButtonState;
@@ -174,12 +174,23 @@ void handleArmedState()
 {
   updateStateDisplay("ALARM UZBROJONY");
   
+  if(handleKeypad()) {
+    state = DISARMED;
+    logEvent("ALARM ROZBROJONY - Podano poprawny kod");
+    clearDisplay(0);
+    clearDisplay(1);
+    PORTC |= (1 << PORTC2);  // Zielona LED ON
+    PORTC &= ~(1 << PORTC3); // Niebieska LED OFF
+    return; // Kończymy funkcję, żeby nie sprawdzać już czujnika w tej pętli
+  }
+
   if(isIntruderDetected())
   {
     state = ENTRY_DELAY;
     logEvent("WYKRYTO INTRUZA - Oczekiwanie na kod");
     alarmStartTime = millis();
     clearDisplay(0);
+    clearDisplay(1);
   }
 }
 
