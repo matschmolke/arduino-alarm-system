@@ -4,7 +4,7 @@
 #include <virtuabotixRTC.h>
 
 // Inicjalizacja RTC (CLK, DAT, RST) 
-virtuabotixRTC myRTC(13, 12, A0);
+virtuabotixRTC myRTC(12, 13, A0);
 // Inicjalizacja LCD
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -61,7 +61,10 @@ void setup() {
   lcd.init();
   lcd.backlight();
 
-  // --- ustawienie pinów przez rejestry ---
+  // Ustawienie czasu (odkomentuj i wpisz datę RAZ, aby ustawić zegar, potem zakomentuj)
+  // myRTC.setDS1302Time(00, 00, 00, 0, 00, 00, 0000); // sek, min, godz, dzień_tyg, dzień, mies, rok
+
+  // ustawienie pinów przez rejestry
   // LEDy i buzzer (A1 = PC1, A2 = PC2, A3 = PC3)
   DDRC |= (1 << DDC1) | (1 << DDC2) | (1 << DDC3); // wyjścia
   PORTC &= ~((1 << PORTC1) | (1 << PORTC2) | (1 << PORTC3)); // start LOW
@@ -73,6 +76,8 @@ void setup() {
   // Ultrasoniczny (trig = PB2, echo = PB3)
   DDRB |= (1 << DDB2);  // trig jako wyjście
   DDRB &= ~(1 << DDB3); // echo jako wejście
+
+  logEvent("ALARM ROZBROJONY - Uruchomienie systemu");
 }
 
 void loop() {
@@ -112,6 +117,7 @@ void handleDisarmedState()
   if(lastButtonState && !currentButtonState)
   {
     state = ARMING;
+    logEvent("UZBRAJANIE ALARMU");
     clearDisplay(0);
   }
   lastButtonState = currentButtonState;
@@ -153,6 +159,7 @@ void handleArmingState()
   
   if (elapsed >= armingDuration) {
     state = ARMED;
+    logEvent("ALARM UZBROJONY");
     armingInProgress = false;
     lastSec = -1;
     noTone(buzzerPin);
@@ -170,6 +177,7 @@ void handleArmedState()
   if(isIntruderDetected())
   {
     state = ENTRY_DELAY;
+    logEvent("WYKRYTO INTRUZA - Oczekiwanie na kod");
     alarmStartTime = millis();
     clearDisplay(0);
   }
@@ -203,6 +211,7 @@ void handleEntryDelayState()
 
   if(handleKeypad()) {
     state = DISARMED;
+    logEvent("ALARM ROZBROJONY");
     noTone(buzzerPin);  
     clearDisplay(0);
     clearDisplay(1);
@@ -213,6 +222,7 @@ void handleEntryDelayState()
   if(millis() - alarmStartTime >= alarmDelay)
   {
     state = ALARM;
+    logEvent("ALARM WŁAMANIOWY!");
     noTone(buzzerPin);
     clearDisplay(0);
     alarmStartTime = millis();
@@ -234,12 +244,28 @@ void handleAlarmState()
   if(handleKeypad())
   {
     state = DISARMED;
+    logEvent("ALARM ROZBROJONY - Podano poprawny kod");
     noTone(buzzerPin); // buzzer OFF
     PORTC |= (1 << PORTC2); // zielona ON
     PORTC &= ~(1 << PORTC3); // niebieska OFF
     clearDisplay(0);
     clearDisplay(1);
   }
+}
+
+// Funkcja do logowania zdarzeń z czasem rzeczywistym
+void logEvent(String event) {
+  myRTC.updateTime();
+  char timestamp[25];
+
+  // Formatowanie do tablicy znaków
+  sprintf(timestamp, "[%02d/%02d/%04d %02d:%02d:%02d]",
+          myRTC.dayofmonth, myRTC.month, myRTC.year, 
+          myRTC.hours, myRTC.minutes, myRTC.seconds);
+        
+  Serial.print(timestamp);
+  Serial.print(" EVENT: ");
+  Serial.println(event);
 }
 
 // ----------- KLAWIATURA ---------------
@@ -254,6 +280,7 @@ bool handleKeypad()
         inputCode = "";
         return true;
       } else {
+        logEvent("BLEDNY KOD: " + inputCode);
         inputCode = "";
         updateMsgDisplay("Bledny kod!");
         return false;
@@ -268,6 +295,7 @@ bool handleKeypad()
   }
   return false;
 }
+
 
 // ----------- LCD ---------------
 
